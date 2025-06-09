@@ -10,7 +10,7 @@ export interface InstallArgv {
   local?: boolean
   yes?: boolean
   gateway?: string
-  args?: string
+  host?: string
 }
 
 export const command = 'install [target]'
@@ -26,11 +26,29 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
     .option('name', {
       type: 'string',
       description: 'Name of the server (auto-extracted from target if not provided)',
+      default: 'spydr-memory',
     })
     .option('client', {
       type: 'string',
       description: 'Client to use for installation',
       demandOption: true,
+    })
+    .option('yes', {
+      type: 'boolean',
+      alias: 'y',
+      description: 'Skip confirmation prompt',
+      default: false,
+    })
+    .option('gateway', {
+      type: 'string',
+      description: 'Gateway to use for installation (defaults to mcp-remote@latest)',
+      default: 'mcp-remote@latest',
+    })
+    .option('host', {
+      type: 'string',
+      description: 'Host to use for installation (e.g., 127.0.0.1)',
+      alias: 'h',
+      default: '127.0.0.1',
     })
     .option('local', {
       type: 'boolean',
@@ -73,7 +91,11 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     if (target.startsWith('http') || target.startsWith('https')) {
       // For URLs, try to extract from the last part of the path
       const urlParts = target.split('/')
-      name = urlParts[urlParts.length - 1] || 'server'
+      if (urlParts.length > 3) {
+        name = urlParts[urlParts.length - 2]
+      } else {
+        name = urlParts[urlParts.length - 1]
+      }
     } else {
       // For commands, try to extract package name
       const parts = target.split(' ')
@@ -98,6 +120,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     }
   }
 
+  if (argv.host) {
+    logger.info(`Using host ${argv.host}`)
+  }
+
   logger.info(`Installing MCP server ${argv.client} with target ${argv.target} and name ${name}`)
 
   let ready = argv.yes
@@ -118,13 +144,11 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
 
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
-        const gatewayArgs = ['npx', '-y', argv.gateway || 'mcp-remote@latest', '--sse', target]
-        if (argv.args) {
-          gatewayArgs.push(...argv.args.split(' '))
-        }
+        const gatewayArgs = argv.gateway ? [argv.gateway] : ['mcp-remote@latest']
+        const hostArg = argv.host ? [`--host`, argv.host] : []
         config.mcpServers[name] = {
           command: 'npx',
-          args: gatewayArgs,
+          args: ['-y', ...gatewayArgs, target, ...hostArg],
         }
         writeConfig(config, argv.client, argv.local)
       }
