@@ -11,6 +11,7 @@ export interface InstallArgv {
   yes?: boolean
   gateway?: string
   host?: string
+  transport?: string
 }
 
 export const command = 'install [target]'
@@ -49,6 +50,12 @@ export function builder(yargs: Argv<InstallArgv>): Argv {
       description: 'Host to use for installation (e.g., 127.0.0.1)',
       alias: 'h',
       default: '127.0.0.1',
+    })
+    .option('transport', {
+      type: 'string',
+      description: 'Transport to use for installation (e.g., http-only)',
+      alias: 't',
+      default: 'http-only',
     })
     .option('local', {
       type: 'boolean',
@@ -124,6 +131,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
     logger.info(`Using host ${argv.host}`)
   }
 
+  if (argv.transport) {
+    logger.info(`Using transport ${argv.transport}`)
+  }
+
   logger.info(`Installing MCP server ${argv.client} with target ${argv.target} and name ${name}`)
 
   let ready = argv.yes
@@ -145,10 +156,10 @@ export async function handler(argv: ArgumentsCamelCase<InstallArgv>) {
       // if it is a URL, add it to config
       if (target.startsWith('http') || target.startsWith('https')) {
         const gatewayArgs = argv.gateway ? [argv.gateway] : ['mcp-remote@latest']
-        const hostArg = argv.host ? [`--host`, argv.host] : []
+        const transportArg = argv.transport ? [`--transport`, argv.transport] : []
         config.mcpServers[name] = {
           command: 'npx',
-          args: ['-y', ...gatewayArgs, target, ...hostArg],
+          args: ['-y', ...gatewayArgs, target, ...transportArg],
         }
         writeConfig(config, argv.client, argv.local)
       }
